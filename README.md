@@ -1,2 +1,3 @@
 # lystex-v1
-Code for the LEGO video game LYST
+
+This is the future locaiton of the Lystex Excape Room website!
