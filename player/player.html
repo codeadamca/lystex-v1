@@ -175,6 +175,19 @@ function playNamedVideo(name) {
   playVideo(filename);
 }
 
+function stopCurrentVideo() {
+  const overlay = document.getElementById("videoOverlay");
+  const video = document.getElementById("videoPlayer");
+
+  video.pause();
+  video.onended = null;
+  video.currentTime = 0;
+  video.removeAttribute("src");
+  video.load();
+  overlay.style.display = "none";
+  videoPlaying = false;
+}
+
 // Play a video overlay
 function playVideo(filename) {
   videoPlaying = true;
@@ -266,6 +279,10 @@ function handleRemoteCommand(command) {
 
   if (command.type === "reset") {
     resetTimer();
+  }
+
+  if (command.type === "stop") {
+    stopCurrentVideo();
   }
 }
 

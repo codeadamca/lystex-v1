@@ -101,6 +101,7 @@ button:disabled {
 		<button class="remoteButton" onclick="sendCommand('goodbye')" disabled>Control Goodbye</button>
 		<button class="remoteButton" onclick="sendCommand('symbols')" disabled>Control Symbols</button>
 		<button class="remoteButton" onclick="sendCommand('gate')" disabled>Control Gate</button>
+		<button class="remoteButton" onclick="stopVideo()" disabled>Stop Video</button>
 		<button class="remoteButton" onclick="resetTimer()" disabled>Reset Timer</button>
 	</div>
 </div>
@@ -217,6 +218,17 @@ function resetTimer() {
 
 	connection.send({ type: "reset" });
 	setStatus("Sent reset command.");
+}
+
+function stopVideo() {
+	if (!connection || !connection.open) {
+		setStatus("Connect to a display first.");
+		setButtonsEnabled(false);
+		return;
+	}
+
+	connection.send({ type: "stop" });
+	setStatus("Sent stop command.");
 }
 
 connectToPlayer();
