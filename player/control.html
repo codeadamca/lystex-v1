@@ -10,17 +10,24 @@
 
 <div class="panel">
 	<h1>Remote Playback</h1>
-	<p>This controller connects automatically to the main display and uses the same four controls as the player.</p>
+	<p>This controller connects automatically to the main display and exposes the same six videos as the player.</p>
 
 	<div id="status">Connecting to display...</div>
 
-	<div class="buttonGrid">
-		<button class="remoteButton" onclick="sendCommand('intro')" disabled>Control Intro</button>
-		<button class="remoteButton" onclick="sendCommand('goodbye')" disabled>Control Goodbye</button>
-		<button class="remoteButton" onclick="sendCommand('symbols')" disabled>Control Symbols</button>
-		<button class="remoteButton" onclick="sendCommand('gate')" disabled>Control Gate</button>
-		<button class="remoteButton" onclick="stopVideo()" disabled>Stop Video</button>
-		<button class="remoteButton" onclick="resetTimer()" disabled>Reset Timer</button>
+	<div class="buttonSection">
+		<div class="buttonGrid">
+			<button class="remoteButton" onclick="sendCommand('game-over')" disabled>Game Over</button>
+			<button class="remoteButton" onclick="sendCommand('gate')" disabled>Gate</button>
+			<button class="remoteButton" onclick="sendCommand('listen')" disabled>Listen</button>
+			<button class="remoteButton" onclick="sendCommand('purple-pink')" disabled>Purple Pink</button>
+			<button class="remoteButton" onclick="sendCommand('symbols')" disabled>Symbols</button>
+			<button class="remoteButton" onclick="sendCommand('win')" disabled>Win</button>
+		</div>
+
+		<div class="controlActions">
+			<button class="remoteButton" onclick="stopVideo()" disabled>Stop Video</button>
+			<button class="remoteButton" onclick="resetTimer()" disabled>Reset Timer</button>
+		</div>
 	</div>
 </div>
 
@@ -135,12 +142,19 @@ function broadcastCommand(command) {
 	return true;
 }
 
+function formatVideoName(videoName) {
+	return videoName
+		.split("-")
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(" ");
+}
+
 function sendCommand(videoName) {
 	if (!broadcastCommand({ type: "play", video: videoName })) {
 		return;
 	}
 
-	setStatus(`Sent ${videoName.toUpperCase()} to all players.`);
+	setStatus(`Sent ${formatVideoName(videoName)} to all players.`);
 }
 
 function resetTimer() {
