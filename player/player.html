@@ -34,6 +34,8 @@ let localChannel;
 let retryDelayMs = 2000;
 const initialRetryDelayMs = 2000;
 const maxRetryDelayMs = 30000;
+let retryTimer;
+let peerInstanceId = 0;
 
 const videoLibrary = {
   "game-over": "videos/game-over.mp4",
@@ -173,9 +175,13 @@ function increaseRetryDelay() {
 }
 
 function schedulePeerRetry() {
+	window.clearTimeout(retryTimer);
   const delay = retryDelayMs;
   increaseRetryDelay();
-  window.setTimeout(createDisplayPeer, delay);
+  retryTimer = window.setTimeout(() => {
+		retryTimer = undefined;
+		createDisplayPeer();
+	}, delay);
 }
 
 function announceLocalReady() {
@@ -187,19 +193,34 @@ function announceLocalReady() {
 }
 
 function createDisplayPeer() {
+  window.clearTimeout(retryTimer);
+  retryTimer = undefined;
+
   if (peer) {
+	peerInstanceId++;
     peer.destroy();
   }
 
+  const currentPeerInstanceId = peerInstanceId + 1;
+  peerInstanceId = currentPeerInstanceId;
   peer = new Peer(playerChannelId);
 
   peer.on("open", () => {
+	if (currentPeerInstanceId !== peerInstanceId) {
+	  return;
+	}
+
     updateRemoteStatus("Waiting for controller");
     resetRetryDelay();
     announceLocalReady();
   });
 
   peer.on("connection", (connection) => {
+	if (currentPeerInstanceId !== peerInstanceId) {
+	  connection.close();
+	  return;
+	}
+
     if (controllerConnection && controllerConnection !== connection) {
       controllerConnection.close();
     }
@@ -227,11 +248,20 @@ function createDisplayPeer() {
   });
 
   peer.on("disconnected", () => {
+	if (currentPeerInstanceId !== peerInstanceId) {
+	  return;
+	}
+
+	peer = undefined;
     updateRemoteStatus("Reconnecting to controller");
     schedulePeerRetry();
   });
 
   peer.on("error", (error) => {
+	if (currentPeerInstanceId !== peerInstanceId) {
+	  return;
+	}
+
     const shouldRetry = error && (
       error.type === "network" ||
       error.type === "server-error" ||
@@ -240,6 +270,7 @@ function createDisplayPeer() {
       error.type === "unavailable-id"
     );
 
+  	peer = undefined;
     updateRemoteStatus("Controller unavailable");
 
     if (shouldRetry) {

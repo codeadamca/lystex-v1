@@ -43,6 +43,7 @@ let localPlayerReady = false;
 let retryDelayMs = 2000;
 const initialRetryDelayMs = 2000;
 const maxRetryDelayMs = 30000;
+let peerInstanceId = 0;
 
 function hasRemoteConnection() {
 	return Boolean(playerConnection && playerConnection.open);
@@ -94,11 +95,21 @@ function buildPeer() {
 		return peer;
 	}
 
+	const currentPeerInstanceId = peerInstanceId + 1;
+	peerInstanceId = currentPeerInstanceId;
 	peer = new Peer();
 	peer.on("open", () => {
+		if (currentPeerInstanceId !== peerInstanceId) {
+			return;
+		}
+
 		connectToPlayer();
 	});
 	peer.on("disconnected", () => {
+		if (currentPeerInstanceId !== peerInstanceId) {
+			return;
+		}
+
 		peer = undefined;
 		playerConnection = undefined;
 		if (!localPlayerReady) {
@@ -108,6 +119,10 @@ function buildPeer() {
 		scheduleReconnect();
 	});
 	peer.on("error", (error) => {
+		if (currentPeerInstanceId !== peerInstanceId) {
+			return;
+		}
+
 		if (peer) {
 			peer.destroy();
 			peer = undefined;
@@ -128,6 +143,8 @@ function scheduleReconnect() {
 	const delay = retryDelayMs;
 	increaseRetryDelay();
 	reconnectTimer = window.setTimeout(() => {
+		reconnectTimer = undefined;
+
 		if (localPlayerReady) {
 			return;
 		}
@@ -138,6 +155,7 @@ function scheduleReconnect() {
 		}
 
 		if (peer) {
+			peerInstanceId++;
 			peer.destroy();
 			peer = undefined;
 		}
