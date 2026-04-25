@@ -49,7 +49,7 @@ body {
 }
 
 .control-page .panel {
-	width: min(520px, calc(100vw - 32px));
+	width: min(560px, calc(100vw - 32px));
 	border: 4px solid var(--panel-border);
 	padding: 24px;
 }
@@ -113,7 +113,7 @@ body {
 
 .buttonGrid {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
+	grid-template-columns: 1fr;
 	gap: 12px;
 }
 
@@ -124,7 +124,7 @@ body {
 
 .controlActions {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
+	grid-template-columns: 1fr;
 	gap: 12px;
 	padding-top: 6px;
 }
@@ -202,7 +202,8 @@ video {
 		grid-template-columns: 1fr;
 	}
 
-	.buttonGrid {
-		display: grid;
+	.control-page .panel {
+		width: calc(100vw - 24px);
+		padding: 20px;
 	}
 }

@@ -28,13 +28,9 @@ let videoPlaying = false;
 let peer;
 let controllerConnection;
 let audioUnlocked = false;
-const remoteChannelId = "lystex-main-controller";
-const peerOptions = {
-  host: "0.peerjs.com",
-  secure: true,
-  port: 443,
-  path: "/"
-};
+const playerChannelId = "lystex-main-player";
+const localChannelName = "lystex-player-control";
+let localChannel;
 
 const videoLibrary = {
   "game-over": "videos/game-over.mp4",
@@ -47,12 +43,28 @@ const videoLibrary = {
 
 // Start the countdown
 function startCountdown() {
+  if (countdownInterval) {
+    return;
+  }
+
   countdownInterval = setInterval(() => {
     if (totalSeconds > 0) {
       totalSeconds--;
       updateDisplay();
+      return;
     }
+
+    stopCountdown();
   }, 1000);
+}
+
+function stopCountdown() {
+  if (!countdownInterval) {
+    return;
+  }
+
+  clearInterval(countdownInterval);
+  countdownInterval = undefined;
 }
 
 // Update the timer display
@@ -64,6 +76,7 @@ function updateDisplay() {
 
 // Reset the countdown
 function resetTimer() {
+	stopCountdown();
   totalSeconds = 7 * 60;
   updateDisplay();
 }
@@ -148,36 +161,50 @@ function updateRemoteStatus(message) {
   return message || "Waiting for controller";
 }
 
+function announceLocalReady() {
+  if (!localChannel) {
+    return;
+  }
+
+  localChannel.postMessage({ type: "player-ready" });
+}
+
 function createDisplayPeer() {
   if (peer) {
     peer.destroy();
   }
 
-  peer = new Peer(undefined, peerOptions);
+  peer = new Peer(playerChannelId);
 
   peer.on("open", () => {
-    updateRemoteStatus("Connecting to controller");
+    updateRemoteStatus("Waiting for controller");
+    announceLocalReady();
+  });
 
-    if (controllerConnection) {
+  peer.on("connection", (connection) => {
+    if (controllerConnection && controllerConnection !== connection) {
       controllerConnection.close();
     }
 
-    controllerConnection = peer.connect(remoteChannelId, { reliable: true });
+    controllerConnection = connection;
+    updateRemoteStatus("Controller connected");
 
-    controllerConnection.on("open", () => {
-      updateRemoteStatus("Connected to controller");
+    connection.on("data", handleRemoteCommand);
+
+    connection.on("close", () => {
+      if (controllerConnection === connection) {
+        controllerConnection = undefined;
+      }
+
+      updateRemoteStatus("Waiting for controller");
     });
 
-    controllerConnection.on("data", handleRemoteCommand);
+    connection.on("error", () => {
+      if (controllerConnection === connection) {
+        controllerConnection = undefined;
+      }
 
-    controllerConnection.on("close", () => {
-      updateRemoteStatus("Controller disconnected");
-      window.setTimeout(createDisplayPeer, 1500);
-    });
-
-    controllerConnection.on("error", () => {
       updateRemoteStatus("Controller unavailable");
-      window.setTimeout(createDisplayPeer, 1500);
     });
   });
 
@@ -216,6 +243,10 @@ function handleRemoteCommand(command) {
     resetTimer();
   }
 
+	if (command.type === "start") {
+		startCountdown();
+	}
+
   if (command.type === "stop") {
     stopCurrentVideo();
   }
@@ -224,16 +255,38 @@ function handleRemoteCommand(command) {
 function setupRemotePlayback() {
   if (typeof Peer === "undefined") {
     updateRemoteStatus("Remote control unavailable");
-    return;
+  } else {
+    createDisplayPeer();
   }
 
-  createDisplayPeer();
+  if (typeof BroadcastChannel !== "undefined") {
+    localChannel = new BroadcastChannel(localChannelName);
+    localChannel.onmessage = (event) => {
+      const command = event.data;
+
+      if (!command || typeof command !== "object") {
+        return;
+      }
+
+      if (command.type === "controller-ready") {
+        announceLocalReady();
+        return;
+      }
+
+      handleRemoteCommand(command);
+    };
+
+    announceLocalReady();
+    window.addEventListener("beforeunload", () => {
+      localChannel.postMessage({ type: "player-gone" });
+      localChannel.close();
+    }, { once: true });
+  }
 }
 
 // Initialize
 updateDisplay();
 updateRemoteStatus();
-startCountdown();
 setupRemotePlayback();
 document.getElementById("audioUnlockButton").addEventListener("click", enableAudio);
 </script>
