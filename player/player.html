@@ -31,6 +31,9 @@ let audioUnlocked = false;
 const playerChannelId = "lystex-main-player";
 const localChannelName = "lystex-player-control";
 let localChannel;
+let retryDelayMs = 2000;
+const initialRetryDelayMs = 2000;
+const maxRetryDelayMs = 30000;
 
 const videoLibrary = {
   "game-over": "videos/game-over.mp4",
@@ -161,6 +164,20 @@ function updateRemoteStatus(message) {
   return message || "Waiting for controller";
 }
 
+function resetRetryDelay() {
+  retryDelayMs = initialRetryDelayMs;
+}
+
+function increaseRetryDelay() {
+  retryDelayMs = Math.min(retryDelayMs * 2, maxRetryDelayMs);
+}
+
+function schedulePeerRetry() {
+  const delay = retryDelayMs;
+  increaseRetryDelay();
+  window.setTimeout(createDisplayPeer, delay);
+}
+
 function announceLocalReady() {
   if (!localChannel) {
     return;
@@ -178,6 +195,7 @@ function createDisplayPeer() {
 
   peer.on("open", () => {
     updateRemoteStatus("Waiting for controller");
+    resetRetryDelay();
     announceLocalReady();
   });
 
@@ -210,7 +228,7 @@ function createDisplayPeer() {
 
   peer.on("disconnected", () => {
     updateRemoteStatus("Reconnecting to controller");
-    window.setTimeout(createDisplayPeer, 1500);
+    schedulePeerRetry();
   });
 
   peer.on("error", (error) => {
@@ -225,7 +243,7 @@ function createDisplayPeer() {
     updateRemoteStatus("Controller unavailable");
 
     if (shouldRetry) {
-      window.setTimeout(createDisplayPeer, 1500);
+      schedulePeerRetry();
     }
   });
 }

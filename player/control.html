@@ -40,6 +40,9 @@ const localChannelName = "lystex-player-control";
 let reconnectTimer;
 let localChannel;
 let localPlayerReady = false;
+let retryDelayMs = 2000;
+const initialRetryDelayMs = 2000;
+const maxRetryDelayMs = 30000;
 
 function hasRemoteConnection() {
 	return Boolean(playerConnection && playerConnection.open);
@@ -47,6 +50,14 @@ function hasRemoteConnection() {
 
 function hasAnyConnection() {
 	return localPlayerReady || hasRemoteConnection();
+}
+
+function resetRetryDelay() {
+	retryDelayMs = initialRetryDelayMs;
+}
+
+function increaseRetryDelay() {
+	retryDelayMs = Math.min(retryDelayMs * 2, maxRetryDelayMs);
 }
 
 function setStatus(message) {
@@ -61,6 +72,7 @@ function setButtonsEnabled(enabled) {
 
 function updateConnectedStatus() {
 	if (localPlayerReady) {
+		resetRetryDelay();
 		setStatus("Connected to local player.");
 		setButtonsEnabled(true);
 		return;
@@ -73,6 +85,7 @@ function updateConnectedStatus() {
 	}
 
 	setStatus("Connected to player.");
+	resetRetryDelay();
 	setButtonsEnabled(true);
 }
 
@@ -112,6 +125,8 @@ function buildPeer() {
 
 function scheduleReconnect() {
 	window.clearTimeout(reconnectTimer);
+	const delay = retryDelayMs;
+	increaseRetryDelay();
 	reconnectTimer = window.setTimeout(() => {
 		if (localPlayerReady) {
 			return;
@@ -128,7 +143,7 @@ function scheduleReconnect() {
 		}
 
 		buildPeer();
-	}, 1500);
+	}, delay);
 }
 
 function connectToPlayer() {
