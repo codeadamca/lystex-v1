@@ -3,91 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <title>Space Control Countdown</title>
-<style>
-:root {
-  color-scheme: dark;
-  --bg: #000000;
-  --timer: #9f7fd2;
-  --timer-shadow: rgba(47, 54, 55, 0.32);
-  --overlay: rgba(31, 35, 36, 0.82);
-  --panel: rgba(244, 237, 213, 0.92);
-  --panel-border: rgba(63, 69, 70, 0.28);
-  --panel-text: #353c3d;
-  --panel-accent: #db88c0;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--timer);
-  font-family: monospace;
-  overflow: hidden;
-}
-
-#screen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  text-align: center;
-}
-
-#timer {
-  font-size: clamp(8rem, 18vw, 16rem);
-  color: var(--timer);
-  text-shadow: 0 0 28px var(--timer-shadow);
-}
-
-#audioUnlock {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--overlay);
-  z-index: 20;
-}
-
-#audioUnlock[hidden] {
-  display: none;
-}
-
-#audioUnlock button {
-  border: 1px solid var(--panel-border);
-  background: var(--panel);
-  color: var(--panel-text);
-  font: inherit;
-  font-size: 1.1rem;
-  letter-spacing: 0.08em;
-  padding: 18px 24px;
-  cursor: pointer;
-  box-shadow: 0 20px 50px rgba(39, 44, 45, 0.28);
-}
-
-#videoOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: #111415;
-  display: none;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
-}
-
-video {
-  width: 100vw;
-  height: 100vh;
-  object-fit: cover;
-}
-</style>
+<link rel="stylesheet" href="styles.css">
 </head>
 
-<body>
+<body class="player-page">
 
 <div id="screen">
   <div id="timer">07:00</div>
