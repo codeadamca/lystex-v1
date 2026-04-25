@@ -8,7 +8,6 @@
   color-scheme: dark;
   --bg: #000000;
   --timer: #9f7fd2;
-  --timer-accent: #db88c0;
   --timer-shadow: rgba(47, 54, 55, 0.32);
   --overlay: rgba(31, 35, 36, 0.82);
   --panel: rgba(244, 237, 213, 0.92);
@@ -36,11 +35,7 @@ body {
 
 #timer {
   font-size: clamp(8rem, 18vw, 16rem);
-  background: linear-gradient(180deg, var(--timer-accent) 0%, var(--timer) 55%, #c5b0eb 100%);
-  color: transparent;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--timer);
   text-shadow: 0 0 28px var(--timer-shadow);
 }
 
