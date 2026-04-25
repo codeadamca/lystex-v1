@@ -109,8 +109,8 @@ button:disabled {
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 let peer;
-let connection;
-const remoteChannelId = "lystex-main-display";
+let playerConnections = [];
+const remoteChannelId = "lystex-main-controller";
 const peerOptions = {
 	host: "0.peerjs.com",
 	secure: true,
@@ -129,19 +129,54 @@ function setButtonsEnabled(enabled) {
 	});
 }
 
+function updateConnectedStatus() {
+	const activeConnections = playerConnections.filter((item) => item.open);
+	const count = activeConnections.length;
+
+	if (count === 0) {
+		setStatus("Waiting for players...");
+		setButtonsEnabled(false);
+		return;
+	}
+
+	setStatus(`Connected to ${count} player${count === 1 ? "" : "s"}.`);
+	setButtonsEnabled(true);
+}
+
 function buildPeer() {
 	if (peer) {
 		return peer;
 	}
 
-	peer = new Peer(undefined, peerOptions);
+	peer = new Peer(remoteChannelId, peerOptions);
+	peer.on("open", () => {
+		updateConnectedStatus();
+	});
+	peer.on("connection", (connection) => {
+		playerConnections.push(connection);
+		updateConnectedStatus();
+
+		connection.on("open", () => {
+			updateConnectedStatus();
+		});
+
+		connection.on("close", () => {
+			playerConnections = playerConnections.filter((item) => item !== connection);
+			updateConnectedStatus();
+		});
+
+		connection.on("error", () => {
+			playerConnections = playerConnections.filter((item) => item !== connection);
+			updateConnectedStatus();
+		});
+	});
 	peer.on("disconnected", () => {
-		setStatus("Reconnecting to display...");
+		setStatus("Reconnecting controller...");
 		setButtonsEnabled(false);
 		scheduleReconnect();
 	});
 	peer.on("error", () => {
-		setStatus("Connection failed. Retrying...");
+		setStatus("Controller failed. Retrying...");
 		setButtonsEnabled(false);
 		scheduleReconnect();
 	});
@@ -151,84 +186,59 @@ function buildPeer() {
 function scheduleReconnect() {
 	window.clearTimeout(reconnectTimer);
 	reconnectTimer = window.setTimeout(() => {
-		if (connection) {
+		playerConnections.forEach((connection) => {
 			connection.close();
-		}
-
+		});
+		playerConnections = [];
 		connectToPlayer();
 	}, 1500);
 }
 
 function connectToPlayer() {
-	setStatus("Connecting to display...");
+	setStatus("Starting controller...");
 	setButtonsEnabled(false);
+	buildPeer();
+}
 
-	const activePeer = buildPeer();
+function broadcastCommand(command) {
+	const activeConnections = playerConnections.filter((item) => item.open);
 
-	const openConnection = () => {
-		if (connection) {
-			connection.close();
-		}
-
-		connection = activePeer.connect(remoteChannelId, { reliable: true });
-
-		connection.on("open", () => {
-			setStatus("Connected to display.");
-			setButtonsEnabled(true);
-		});
-
-		connection.on("close", () => {
-			setStatus("Connection closed. Retrying...");
-			setButtonsEnabled(false);
-			scheduleReconnect();
-		});
-
-		connection.on("error", () => {
-			setStatus("Connection failed. Retrying...");
-			setButtonsEnabled(false);
-			scheduleReconnect();
-		});
-	};
-
-	if (activePeer.open) {
-		openConnection();
-		return;
+	if (activeConnections.length === 0) {
+		setStatus("Waiting for players...");
+		setButtonsEnabled(false);
+		return false;
 	}
 
-	activePeer.once("open", openConnection);
+	activeConnections.forEach((connection) => {
+		connection.send(command);
+	});
+
+	updateConnectedStatus();
+	return true;
 }
 
 function sendCommand(videoName) {
-	if (!connection || !connection.open) {
-		setStatus("Connect to a display first.");
-		setButtonsEnabled(false);
+	if (!broadcastCommand({ type: "play", video: videoName })) {
 		return;
 	}
 
-	connection.send({ type: "play", video: videoName });
-	setStatus(`Sent ${videoName.toUpperCase()} command.`);
+	setStatus(`Sent ${videoName.toUpperCase()} to all players.`);
 }
 
 function resetTimer() {
-	if (!connection || !connection.open) {
-		setStatus("Connect to a display first.");
-		setButtonsEnabled(false);
+	if (!broadcastCommand({ type: "reset" })) {
 		return;
 	}
 
-	connection.send({ type: "reset" });
-	setStatus("Sent reset command.");
+	setStatus("Sent reset to all players.");
 }
 
 function stopVideo() {
-	if (!connection || !connection.open) {
-		setStatus("Connect to a display first.");
-		setButtonsEnabled(false);
+	if (!broadcastCommand({ type: "stop" })) {
 		return;
 	}
 
-	connection.send({ type: "stop" });
-	setStatus("Sent stop command.");
+	setStatus("Sent stop to all players.");
 }
 
 connectToPlayer();

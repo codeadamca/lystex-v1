@@ -107,8 +107,9 @@ let totalSeconds = 7 * 60;
 let countdownInterval;
 let videoPlaying = false;
 let peer;
+let controllerConnection;
 let audioUnlocked = false;
-const remoteChannelId = "lystex-main-display";
+const remoteChannelId = "lystex-main-controller";
 const peerOptions = {
   host: "0.peerjs.com",
   secure: true,
@@ -231,24 +232,37 @@ function createDisplayPeer() {
     peer.destroy();
   }
 
-  peer = new Peer(remoteChannelId, peerOptions);
+  peer = new Peer(undefined, peerOptions);
 
   peer.on("open", () => {
-    updateRemoteStatus("Remote control ready");
-  });
+    updateRemoteStatus("Connecting to controller");
 
-  peer.on("connection", (connection) => {
-    updateRemoteStatus("Controller connected");
+    if (controllerConnection) {
+      controllerConnection.close();
+    }
 
-    connection.on("data", handleRemoteCommand);
-    connection.on("close", () => {
+    controllerConnection = peer.connect(remoteChannelId, { reliable: true });
+
+    controllerConnection.on("open", () => {
+      updateRemoteStatus("Connected to controller");
+    });
+
+    controllerConnection.on("data", handleRemoteCommand);
+
+    controllerConnection.on("close", () => {
       updateRemoteStatus("Controller disconnected");
+      window.setTimeout(createDisplayPeer, 1500);
+    });
+
+    controllerConnection.on("error", () => {
+      updateRemoteStatus("Controller unavailable");
+      window.setTimeout(createDisplayPeer, 1500);
     });
   });
 
   peer.on("disconnected", () => {
-    updateRemoteStatus("Remote control reconnecting");
-    peer.reconnect();
+    updateRemoteStatus("Reconnecting to controller");
+    window.setTimeout(createDisplayPeer, 1500);
   });
 
   peer.on("error", (error) => {
@@ -260,7 +274,7 @@ function createDisplayPeer() {
       error.type === "unavailable-id"
     );
 
-    updateRemoteStatus("Remote control unavailable");
+    updateRemoteStatus("Controller unavailable");
 
     if (shouldRetry) {
       window.setTimeout(createDisplayPeer, 1500);
