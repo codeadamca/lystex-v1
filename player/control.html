@@ -31,36 +31,15 @@
 	</div>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script>
-let peer;
-let playerConnections = [];
-const remoteChannelId = "lystex-main-controller";
-const peerOptions = {
-	host: "0.peerjs.com",
-	secure: true,
-	port: 443,
-	path: "/"
-};
-const localChannelName = "lystex-player-control";
-let reconnectTimer;
-let localChannel;
-let localPlayerReady = false;
-let retryDelayMs = 3000;
-const initialRetryDelayMs = 3000;
-const maxRetryDelayMs = 30000;
+<script type="module">
+import { db, ref, onValue, set, serverTimestamp } from "./firebase-config.js";
+
+let remotePlayerReady = false;
+const commandRef = ref(db, "remote/command");
+const presenceRef = ref(db, "remote/presence");
 
 function hasAnyConnection() {
-	const activeConnections = playerConnections.filter((item) => item.open);
-	return localPlayerReady || activeConnections.length > 0;
-}
-
-function resetRetryDelay() {
-	retryDelayMs = initialRetryDelayMs;
-}
-
-function increaseRetryDelay() {
-	retryDelayMs = Math.min(retryDelayMs * 2, maxRetryDelayMs);
+	return remotePlayerReady;
 }
 
 function setStatus(message) {
@@ -74,113 +53,27 @@ function setButtonsEnabled(enabled) {
 }
 
 function updateConnectedStatus() {
-	if (localPlayerReady) {
-		resetRetryDelay();
-		setStatus("Connected to local player.");
-		setButtonsEnabled(true);
-		return;
-	}
-
-	const activeConnections = playerConnections.filter((item) => item.open);
-	const count = activeConnections.length;
-
-	if (count === 0) {
+	if (!remotePlayerReady) {
 		setStatus("Waiting for players...");
 		setButtonsEnabled(false);
 		return;
 	}
 
-	setStatus(`Connected to ${count} player${count === 1 ? "" : "s"}.`);
-	resetRetryDelay();
+	setStatus("Connected to remote player.");
 	setButtonsEnabled(true);
 }
 
-function buildPeer() {
-	if (peer) {
-		return peer;
-	}
-
-	peer = new Peer(remoteChannelId, peerOptions);
-	peer.on("open", () => {
-		updateConnectedStatus();
-	});
-	peer.on("connection", (connection) => {
-		playerConnections.push(connection);
-		updateConnectedStatus();
-
-		connection.on("open", () => {
-			updateConnectedStatus();
-		});
-
-		connection.on("close", () => {
-			playerConnections = playerConnections.filter((item) => item !== connection);
-			updateConnectedStatus();
-		});
-
-		connection.on("error", () => {
-			playerConnections = playerConnections.filter((item) => item !== connection);
-			updateConnectedStatus();
-		});
-	});
-	peer.on("disconnected", () => {
-		peer = undefined;
-		playerConnections = [];
-		if (!localPlayerReady) {
-			setStatus("Reconnecting controller...");
-			setButtonsEnabled(false);
-		}
-		scheduleReconnect();
-	});
-	peer.on("error", (error) => {
-		if (peer) {
-			peer.destroy();
-			peer = undefined;
-		}
-		playerConnections = [];
-		const errorLabel = error && error.type ? error.type : "unknown error";
-		if (!localPlayerReady) {
-			setStatus(`Controller failed (${errorLabel}). Retrying...`);
-			setButtonsEnabled(false);
-		}
-		scheduleReconnect();
-	});
-	return peer;
-}
-
-function scheduleReconnect() {
-	window.clearTimeout(reconnectTimer);
-	const delay = retryDelayMs;
-	increaseRetryDelay();
-	reconnectTimer = window.setTimeout(() => {
-		reconnectTimer = undefined;
-
-		if (localPlayerReady) {
-			return;
-		}
-
-		playerConnections.forEach((connection) => {
-			connection.close();
-		});
-		playerConnections = [];
-
-		if (peer) {
-			peer.destroy();
-			peer = undefined;
-		}
-
-		buildPeer();
-	}, delay);
-}
-
 function broadcastCommand(command) {
-	if (localPlayerReady && localChannel) {
-		localChannel.postMessage(command);
+	if (remotePlayerReady) {
+		set(commandRef, {
+			...command,
+			nonce: Date.now(),
+			updatedAt: serverTimestamp()
+		}).catch(() => {
+			setStatus("Remote command failed.");
+			setButtonsEnabled(false);
+		});
 	}
-
-	const activeConnections = playerConnections.filter((item) => item.open);
-	activeConnections.forEach((connection) => {
-		connection.send(command);
-	});
 
 	if (!hasAnyConnection()) {
 		setStatus("Waiting for players...");
@@ -192,34 +85,16 @@ function broadcastCommand(command) {
 	return true;
 }
 
-function setupLocalChannel() {
-	if (typeof BroadcastChannel === "undefined") {
-		return;
-	}
-
-	localChannel = new BroadcastChannel(localChannelName);
-	localChannel.onmessage = (event) => {
-		const message = event.data;
-
-		if (!message || typeof message !== "object") {
-			return;
-		}
-
-		if (message.type === "player-ready") {
-			localPlayerReady = true;
-			updateConnectedStatus();
-		}
-
-		if (message.type === "player-gone") {
-			localPlayerReady = false;
-			if (playerConnections.filter((item) => item.open).length === 0) {
-				setStatus("Waiting for players...");
-				setButtonsEnabled(false);
-			}
-		}
-	};
-
-	localChannel.postMessage({ type: "controller-ready" });
+function setupRemoteChannel() {
+	onValue(presenceRef, (snapshot) => {
+		const data = snapshot.val();
+		remotePlayerReady = Boolean(data && data.playerReady);
+		updateConnectedStatus();
+	}, () => {
+		remotePlayerReady = false;
+		setStatus("Remote status unavailable.");
+		setButtonsEnabled(false);
+	});
 }
 
 function formatVideoName(videoName) {
@@ -261,8 +136,12 @@ function stopVideo() {
 	setStatus("Sent stop to all players.");
 }
 
-setupLocalChannel();
-buildPeer();
+window.sendCommand = sendCommand;
+window.resetTimer = resetTimer;
+window.startTimer = startTimer;
+window.stopVideo = stopVideo;
+
+setupRemoteChannel();
 </script>
 
 </body>

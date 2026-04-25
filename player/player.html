@@ -20,27 +20,16 @@
   <video id="videoPlayer" playsinline preload="auto"></video>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script>
+<script type="module">
+import { db, ref, onValue, set, update, onDisconnect, serverTimestamp } from "./firebase-config.js";
+
 let totalSeconds = 7 * 60;
 let countdownInterval;
 let videoPlaying = false;
-let peer;
-let controllerConnection;
 let audioUnlocked = false;
-const remoteChannelId = "lystex-main-controller";
-const peerOptions = {
-  host: "0.peerjs.com",
-  secure: true,
-  port: 443,
-  path: "/"
-};
-const localChannelName = "lystex-player-control";
-let localChannel;
-let retryDelayMs = 3000;
-const initialRetryDelayMs = 3000;
-const maxRetryDelayMs = 30000;
-let retryTimer;
+let lastProcessedNonce = 0;
+const commandRef = ref(db, "remote/command");
+const presenceRef = ref(db, "remote/presence");
 
 const videoLibrary = {
   "game-over": "videos/game-over.mp4",
@@ -168,100 +157,39 @@ function playVideo(filename) {
 }
 
 function updateRemoteStatus(message) {
-  return message || "Waiting for controller";
+	document.body.dataset.remoteStatus = message || "Waiting for controller";
+  return document.body.dataset.remoteStatus;
 }
 
-function resetRetryDelay() {
-  retryDelayMs = initialRetryDelayMs;
-}
-
-function increaseRetryDelay() {
-  retryDelayMs = Math.min(retryDelayMs * 2, maxRetryDelayMs);
-}
-
-function schedulePeerRetry() {
-	window.clearTimeout(retryTimer);
-  const delay = retryDelayMs;
-  increaseRetryDelay();
-  retryTimer = window.setTimeout(() => {
-		retryTimer = undefined;
-		createDisplayPeer();
-	}, delay);
-}
-
-function announceLocalReady() {
-  if (!localChannel) {
-    return;
-  }
-
-  localChannel.postMessage({ type: "player-ready" });
-}
-
-function createDisplayPeer() {
-  window.clearTimeout(retryTimer);
-  retryTimer = undefined;
-
-  if (peer) {
-    peer.destroy();
-    peer = undefined;
-  }
-
-  peer = new Peer(undefined, peerOptions);
-
-  peer.on("open", () => {
-    updateRemoteStatus("Connecting to controller");
-    resetRetryDelay();
-    announceLocalReady();
-
-    if (controllerConnection) {
-		controllerConnection.close();
-	}
-
-	controllerConnection = peer.connect(remoteChannelId, { reliable: true });
-
-	controllerConnection.on("open", () => {
-		updateRemoteStatus("Connected to controller");
-		resetRetryDelay();
-	});
-
-	controllerConnection.on("data", handleRemoteCommand);
-
-	controllerConnection.on("close", () => {
-		controllerConnection = undefined;
-		updateRemoteStatus("Controller disconnected");
-		schedulePeerRetry();
-	});
-
-	controllerConnection.on("error", () => {
-		controllerConnection = undefined;
-		updateRemoteStatus("Controller unavailable");
-		schedulePeerRetry();
-	});
+function setupRemoteChannel() {
+  set(presenceRef, {
+    playerReady: true,
+    updatedAt: serverTimestamp()
+  }).catch(() => {
+    updateRemoteStatus("Remote control unavailable");
   });
 
-  peer.on("disconnected", () => {
-	peer = undefined;
-	controllerConnection = undefined;
-    updateRemoteStatus("Reconnecting to controller");
-    schedulePeerRetry();
+  onDisconnect(presenceRef).update({
+    playerReady: false,
+    updatedAt: serverTimestamp()
   });
 
-  peer.on("error", (error) => {
-    const shouldRetry = error && (
-      error.type === "network" ||
-      error.type === "server-error" ||
-      error.type === "socket-error" ||
-      error.type === "socket-closed" ||
-      error.type === "unavailable-id"
-    );
+  onValue(commandRef, (snapshot) => {
+    const command = snapshot.val();
 
-	peer = undefined;
-	controllerConnection = undefined;
-    updateRemoteStatus("Controller unavailable");
-
-    if (shouldRetry) {
-      schedulePeerRetry();
+    if (!command || typeof command !== "object") {
+      return;
     }
+
+    if (typeof command.nonce !== "number" || command.nonce <= lastProcessedNonce) {
+      return;
+    }
+
+    lastProcessedNonce = command.nonce;
+    handleRemoteCommand(command);
+    updateRemoteStatus("Connected to controller");
+  }, () => {
+    updateRemoteStatus("Remote control unavailable");
   });
 }
 
@@ -288,36 +216,17 @@ function handleRemoteCommand(command) {
 }
 
 function setupRemotePlayback() {
-  if (typeof Peer === "undefined") {
-    updateRemoteStatus("Remote control unavailable");
-  } else {
-    createDisplayPeer();
-  }
-
-  if (typeof BroadcastChannel !== "undefined") {
-    localChannel = new BroadcastChannel(localChannelName);
-    localChannel.onmessage = (event) => {
-      const command = event.data;
-
-      if (!command || typeof command !== "object") {
-        return;
-      }
-
-      if (command.type === "controller-ready") {
-        announceLocalReady();
-        return;
-      }
-
-      handleRemoteCommand(command);
-    };
-
-    announceLocalReady();
-    window.addEventListener("beforeunload", () => {
-      localChannel.postMessage({ type: "player-gone" });
-      localChannel.close();
-    }, { once: true });
-  }
+	setupRemoteChannel();
 }
+
+window.addEventListener("beforeunload", () => {
+  update(presenceRef, {
+		playerReady: false,
+		updatedAt: serverTimestamp()
+	}).catch(() => {
+		return undefined;
+	});
+}, { once: true });
 
 // Initialize
 updateDisplay();
