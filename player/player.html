@@ -68,6 +68,12 @@ let countdownInterval;
 let videoPlaying = false;
 let peer;
 const remoteChannelId = "lystex-main-display";
+const peerOptions = {
+  host: "0.peerjs.com",
+  secure: true,
+  port: 443,
+  path: "/"
+};
 
 const videoLibrary = {
   intro: "videos/intro.mp4",
@@ -147,6 +153,48 @@ function updateRemoteStatus(message) {
   return message || "Waiting for controller";
 }
 
+function createDisplayPeer() {
+  if (peer) {
+    peer.destroy();
+  }
+
+  peer = new Peer(remoteChannelId, peerOptions);
+
+  peer.on("open", () => {
+    updateRemoteStatus("Remote control ready");
+  });
+
+  peer.on("connection", (connection) => {
+    updateRemoteStatus("Controller connected");
+
+    connection.on("data", handleRemoteCommand);
+    connection.on("close", () => {
+      updateRemoteStatus("Controller disconnected");
+    });
+  });
+
+  peer.on("disconnected", () => {
+    updateRemoteStatus("Remote control reconnecting");
+    peer.reconnect();
+  });
+
+  peer.on("error", (error) => {
+    const shouldRetry = error && (
+      error.type === "network" ||
+      error.type === "server-error" ||
+      error.type === "socket-error" ||
+      error.type === "socket-closed" ||
+      error.type === "unavailable-id"
+    );
+
+    updateRemoteStatus("Remote control unavailable");
+
+    if (shouldRetry) {
+      window.setTimeout(createDisplayPeer, 1500);
+    }
+  });
+}
+
 function handleRemoteCommand(command) {
   if (!command || typeof command !== "object") {
     return;
@@ -167,24 +215,7 @@ function setupRemotePlayback() {
     return;
   }
 
-  peer = new Peer(remoteChannelId);
-
-  peer.on("open", () => {
-    updateRemoteStatus("Remote control ready");
-  });
-
-  peer.on("connection", (connection) => {
-    updateRemoteStatus("Controller connected");
-
-    connection.on("data", handleRemoteCommand);
-    connection.on("close", () => {
-      updateRemoteStatus("Controller disconnected");
-    });
-  });
-
-  peer.on("error", () => {
-    updateRemoteStatus("Remote control unavailable");
-  });
+  createDisplayPeer();
 }
 
 // Initialize

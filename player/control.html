@@ -94,6 +94,13 @@ button:disabled {
 let peer;
 let connection;
 const remoteChannelId = "lystex-main-display";
+const peerOptions = {
+	host: "0.peerjs.com",
+	secure: true,
+	port: 443,
+	path: "/"
+};
+let reconnectTimer;
 
 function setStatus(message) {
 	document.getElementById("status").textContent = message;
@@ -110,12 +117,29 @@ function buildPeer() {
 		return peer;
 	}
 
-	peer = new Peer();
-	peer.on("error", () => {
-		setStatus("Connection failed.");
+	peer = new Peer(undefined, peerOptions);
+	peer.on("disconnected", () => {
+		setStatus("Reconnecting to display...");
 		setButtonsEnabled(false);
+		scheduleReconnect();
+	});
+	peer.on("error", () => {
+		setStatus("Connection failed. Retrying...");
+		setButtonsEnabled(false);
+		scheduleReconnect();
 	});
 	return peer;
+}
+
+function scheduleReconnect() {
+	window.clearTimeout(reconnectTimer);
+	reconnectTimer = window.setTimeout(() => {
+		if (connection) {
+			connection.close();
+		}
+
+		connectToPlayer();
+	}, 1500);
 }
 
 function connectToPlayer() {
@@ -137,13 +161,15 @@ function connectToPlayer() {
 		});
 
 		connection.on("close", () => {
-			setStatus("Connection closed.");
+			setStatus("Connection closed. Retrying...");
 			setButtonsEnabled(false);
+			scheduleReconnect();
 		});
 
 		connection.on("error", () => {
-			setStatus("Connection failed.");
+			setStatus("Connection failed. Retrying...");
 			setButtonsEnabled(false);
+			scheduleReconnect();
 		});
 	};
 
