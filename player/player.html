@@ -30,6 +30,33 @@ body {
   text-shadow: 0 0 28px rgba(0, 234, 255, 0.75);
 }
 
+#audioUnlock {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(1, 2, 3, 0.72);
+  z-index: 20;
+}
+
+#audioUnlock[hidden] {
+  display: none;
+}
+
+#audioUnlock button {
+  border: 1px solid rgba(0, 234, 255, 0.35);
+  background: rgba(0, 7, 15, 0.9);
+  color: #00eaff;
+  font: inherit;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  padding: 18px 24px;
+  cursor: pointer;
+  box-shadow: 0 0 40px rgba(0, 234, 255, 0.12);
+}
+
 #videoOverlay {
   position: fixed;
   top: 0;
@@ -57,6 +84,10 @@ video {
   <div id="timer">07:00</div>
 </div>
 
+<div id="audioUnlock">
+  <button id="audioUnlockButton" type="button">Tap Once To Enable Audio</button>
+</div>
+
 <div id="videoOverlay">
   <video id="videoPlayer" playsinline preload="auto"></video>
 </div>
@@ -67,6 +98,7 @@ let totalSeconds = 7 * 60;
 let countdownInterval;
 let videoPlaying = false;
 let peer;
+let audioUnlocked = false;
 const remoteChannelId = "lystex-main-display";
 const peerOptions = {
   host: "0.peerjs.com",
@@ -105,6 +137,25 @@ function resetTimer() {
   updateDisplay();
 }
 
+function hideAudioUnlock() {
+  document.getElementById("audioUnlock").hidden = true;
+}
+
+function enableAudio() {
+  audioUnlocked = true;
+
+  const video = document.getElementById("videoPlayer");
+  video.muted = false;
+
+  if (videoPlaying) {
+    video.play().catch(() => {
+      return undefined;
+    });
+  }
+
+  hideAudioUnlock();
+}
+
 function playNamedVideo(name) {
   const filename = videoLibrary[name];
 
@@ -117,16 +168,16 @@ function playNamedVideo(name) {
 
 // Play a video overlay
 function playVideo(filename) {
-  if (videoPlaying) return; // Prevent multiple videos at once
-
   videoPlaying = true;
 
   const overlay = document.getElementById("videoOverlay");
   const video = document.getElementById("videoPlayer");
 
+  // Interrupt the current video immediately when a new command arrives.
   video.pause();
+  video.onended = null;
   video.currentTime = 0;
-  video.muted = false;
+  video.muted = !audioUnlocked;
   video.src = filename;
   overlay.style.display = "flex";
 
@@ -134,7 +185,7 @@ function playVideo(filename) {
 
   if (playAttempt && typeof playAttempt.catch === "function") {
     playAttempt.catch(() => {
-      // Fall back to muted autoplay when the browser blocks remote playback.
+      // Fall back to muted autoplay until the display page has been tapped once.
       video.muted = true;
       video.play().catch(() => {
         overlay.style.display = "none";
@@ -223,6 +274,7 @@ updateDisplay();
 updateRemoteStatus();
 startCountdown();
 setupRemotePlayback();
+document.getElementById("audioUnlockButton").addEventListener("click", enableAudio);
 </script>
 
 </body>
