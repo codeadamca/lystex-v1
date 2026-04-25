@@ -28,14 +28,19 @@ let videoPlaying = false;
 let peer;
 let controllerConnection;
 let audioUnlocked = false;
-const playerChannelId = "lystex-main-player";
+const remoteChannelId = "lystex-main-controller";
+const peerOptions = {
+  host: "0.peerjs.com",
+  secure: true,
+  port: 443,
+  path: "/"
+};
 const localChannelName = "lystex-player-control";
 let localChannel;
-let retryDelayMs = 2000;
-const initialRetryDelayMs = 2000;
+let retryDelayMs = 3000;
+const initialRetryDelayMs = 3000;
 const maxRetryDelayMs = 30000;
 let retryTimer;
-let peerInstanceId = 0;
 
 const videoLibrary = {
   "game-over": "videos/game-over.mp4",
@@ -197,71 +202,51 @@ function createDisplayPeer() {
   retryTimer = undefined;
 
   if (peer) {
-	peerInstanceId++;
     peer.destroy();
+    peer = undefined;
   }
 
-  const currentPeerInstanceId = peerInstanceId + 1;
-  peerInstanceId = currentPeerInstanceId;
-  peer = new Peer(playerChannelId);
+  peer = new Peer(undefined, peerOptions);
 
   peer.on("open", () => {
-	if (currentPeerInstanceId !== peerInstanceId) {
-	  return;
-	}
-
-    updateRemoteStatus("Waiting for controller");
+    updateRemoteStatus("Connecting to controller");
     resetRetryDelay();
     announceLocalReady();
-  });
 
-  peer.on("connection", (connection) => {
-	if (currentPeerInstanceId !== peerInstanceId) {
-	  connection.close();
-	  return;
+    if (controllerConnection) {
+		controllerConnection.close();
 	}
 
-    if (controllerConnection && controllerConnection !== connection) {
-      controllerConnection.close();
-    }
+	controllerConnection = peer.connect(remoteChannelId, { reliable: true });
 
-    controllerConnection = connection;
-    updateRemoteStatus("Controller connected");
+	controllerConnection.on("open", () => {
+		updateRemoteStatus("Connected to controller");
+		resetRetryDelay();
+	});
 
-    connection.on("data", handleRemoteCommand);
+	controllerConnection.on("data", handleRemoteCommand);
 
-    connection.on("close", () => {
-      if (controllerConnection === connection) {
-        controllerConnection = undefined;
-      }
+	controllerConnection.on("close", () => {
+		controllerConnection = undefined;
+		updateRemoteStatus("Controller disconnected");
+		schedulePeerRetry();
+	});
 
-      updateRemoteStatus("Waiting for controller");
-    });
-
-    connection.on("error", () => {
-      if (controllerConnection === connection) {
-        controllerConnection = undefined;
-      }
-
-      updateRemoteStatus("Controller unavailable");
-    });
+	controllerConnection.on("error", () => {
+		controllerConnection = undefined;
+		updateRemoteStatus("Controller unavailable");
+		schedulePeerRetry();
+	});
   });
 
   peer.on("disconnected", () => {
-	if (currentPeerInstanceId !== peerInstanceId) {
-	  return;
-	}
-
 	peer = undefined;
+	controllerConnection = undefined;
     updateRemoteStatus("Reconnecting to controller");
     schedulePeerRetry();
   });
 
   peer.on("error", (error) => {
-	if (currentPeerInstanceId !== peerInstanceId) {
-	  return;
-	}
-
     const shouldRetry = error && (
       error.type === "network" ||
       error.type === "server-error" ||
@@ -270,7 +255,8 @@ function createDisplayPeer() {
       error.type === "unavailable-id"
     );
 
-  	peer = undefined;
+	peer = undefined;
+	controllerConnection = undefined;
     updateRemoteStatus("Controller unavailable");
 
     if (shouldRetry) {

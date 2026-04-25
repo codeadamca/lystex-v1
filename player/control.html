@@ -34,23 +34,25 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 let peer;
-let playerConnection;
-const playerChannelId = "lystex-main-player";
+let playerConnections = [];
+const remoteChannelId = "lystex-main-controller";
+const peerOptions = {
+	host: "0.peerjs.com",
+	secure: true,
+	port: 443,
+	path: "/"
+};
 const localChannelName = "lystex-player-control";
 let reconnectTimer;
 let localChannel;
 let localPlayerReady = false;
-let retryDelayMs = 2000;
-const initialRetryDelayMs = 2000;
+let retryDelayMs = 3000;
+const initialRetryDelayMs = 3000;
 const maxRetryDelayMs = 30000;
-let peerInstanceId = 0;
-
-function hasRemoteConnection() {
-	return Boolean(playerConnection && playerConnection.open);
-}
 
 function hasAnyConnection() {
-	return localPlayerReady || hasRemoteConnection();
+	const activeConnections = playerConnections.filter((item) => item.open);
+	return localPlayerReady || activeConnections.length > 0;
 }
 
 function resetRetryDelay() {
@@ -79,13 +81,16 @@ function updateConnectedStatus() {
 		return;
 	}
 
-	if (!hasRemoteConnection()) {
+	const activeConnections = playerConnections.filter((item) => item.open);
+	const count = activeConnections.length;
+
+	if (count === 0) {
 		setStatus("Waiting for players...");
 		setButtonsEnabled(false);
 		return;
 	}
 
-	setStatus("Connected to player.");
+	setStatus(`Connected to ${count} player${count === 1 ? "" : "s"}.`);
 	resetRetryDelay();
 	setButtonsEnabled(true);
 }
@@ -95,23 +100,31 @@ function buildPeer() {
 		return peer;
 	}
 
-	const currentPeerInstanceId = peerInstanceId + 1;
-	peerInstanceId = currentPeerInstanceId;
-	peer = new Peer();
+	peer = new Peer(remoteChannelId, peerOptions);
 	peer.on("open", () => {
-		if (currentPeerInstanceId !== peerInstanceId) {
-			return;
-		}
+		updateConnectedStatus();
+	});
+	peer.on("connection", (connection) => {
+		playerConnections.push(connection);
+		updateConnectedStatus();
 
-		connectToPlayer();
+		connection.on("open", () => {
+			updateConnectedStatus();
+		});
+
+		connection.on("close", () => {
+			playerConnections = playerConnections.filter((item) => item !== connection);
+			updateConnectedStatus();
+		});
+
+		connection.on("error", () => {
+			playerConnections = playerConnections.filter((item) => item !== connection);
+			updateConnectedStatus();
+		});
 	});
 	peer.on("disconnected", () => {
-		if (currentPeerInstanceId !== peerInstanceId) {
-			return;
-		}
-
 		peer = undefined;
-		playerConnection = undefined;
+		playerConnections = [];
 		if (!localPlayerReady) {
 			setStatus("Reconnecting controller...");
 			setButtonsEnabled(false);
@@ -119,15 +132,11 @@ function buildPeer() {
 		scheduleReconnect();
 	});
 	peer.on("error", (error) => {
-		if (currentPeerInstanceId !== peerInstanceId) {
-			return;
-		}
-
 		if (peer) {
 			peer.destroy();
 			peer = undefined;
 		}
-		playerConnection = undefined;
+		playerConnections = [];
 		const errorLabel = error && error.type ? error.type : "unknown error";
 		if (!localPlayerReady) {
 			setStatus(`Controller failed (${errorLabel}). Retrying...`);
@@ -149,13 +158,12 @@ function scheduleReconnect() {
 			return;
 		}
 
-		if (playerConnection) {
-			playerConnection.close();
-			playerConnection = undefined;
-		}
+		playerConnections.forEach((connection) => {
+			connection.close();
+		});
+		playerConnections = [];
 
 		if (peer) {
-			peerInstanceId++;
 			peer.destroy();
 			peer = undefined;
 		}
@@ -164,53 +172,15 @@ function scheduleReconnect() {
 	}, delay);
 }
 
-function connectToPlayer() {
-	if (localPlayerReady) {
-		updateConnectedStatus();
-		return;
-	}
-
-	if (!peer || peer.destroyed) {
-		buildPeer();
-		return;
-	}
-
-	if (playerConnection) {
-		playerConnection.close();
-	}
-
-	setStatus("Connecting to player...");
-	setButtonsEnabled(false);
-	playerConnection = peer.connect(playerChannelId, { reliable: true });
-
-	playerConnection.on("open", () => {
-		updateConnectedStatus();
-	});
-
-	playerConnection.on("close", () => {
-		playerConnection = undefined;
-		setStatus("Player disconnected. Retrying...");
-		setButtonsEnabled(false);
-		scheduleReconnect();
-	});
-
-	playerConnection.on("error", (error) => {
-		playerConnection = undefined;
-		const errorLabel = error && error.type ? error.type : "unknown error";
-		setStatus(`Player unavailable (${errorLabel}). Retrying...`);
-		setButtonsEnabled(false);
-		scheduleReconnect();
-	});
-}
-
 function broadcastCommand(command) {
 	if (localPlayerReady && localChannel) {
 		localChannel.postMessage(command);
 	}
 
-	if (hasRemoteConnection()) {
-		playerConnection.send(command);
-	}
+	const activeConnections = playerConnections.filter((item) => item.open);
+	activeConnections.forEach((connection) => {
+		connection.send(command);
+	});
 
 	if (!hasAnyConnection()) {
 		setStatus("Waiting for players...");
@@ -242,7 +212,7 @@ function setupLocalChannel() {
 
 		if (message.type === "player-gone") {
 			localPlayerReady = false;
-			if (!hasRemoteConnection()) {
+			if (playerConnections.filter((item) => item.open).length === 0) {
 				setStatus("Waiting for players...");
 				setButtonsEnabled(false);
 			}
