@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Space Control Countdown</title>
+<style>
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #0b1830 0%, #04060d 55%, #010203 100%);
+  color: #00eaff;
+  font-family: monospace;
+  overflow: hidden;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+#screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  text-align: center;
+}
+
+#timer {
+  font-size: clamp(8rem, 18vw, 16rem);
+  text-shadow: 0 0 28px rgba(0, 234, 255, 0.75);
+}
+
+#videoOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: black;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+video {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+}
+</style>
+</head>
+
+<body>
+
+<div id="screen">
+  <div id="timer">07:00</div>
+</div>
+
+<div id="videoOverlay">
+  <video id="videoPlayer" playsinline preload="auto"></video>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+let totalSeconds = 7 * 60;
+let countdownInterval;
+let videoPlaying = false;
+let peer;
+const remoteChannelId = "lystex-main-display";
+
+const videoLibrary = {
+  intro: "videos/intro.mp4",
+  goodbye: "videos/goodbye.mp4",
+  symbols: "videos/symbols.mp4",
+  gate: "videos/gate.mp4"
+};
+
+// Start the countdown
+function startCountdown() {
+  countdownInterval = setInterval(() => {
+    if (totalSeconds > 0) {
+      totalSeconds--;
+      updateDisplay();
+    }
+  }, 1000);
+}
+
+// Update the timer display
+function updateDisplay() {
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  document.getElementById("timer").textContent = `${minutes}:${seconds}`;
+}
+
+// Reset the countdown
+function resetTimer() {
+  totalSeconds = 7 * 60;
+  updateDisplay();
+}
+
+function playNamedVideo(name) {
+  const filename = videoLibrary[name];
+
+  if (!filename) {
+    return;
+  }
+
+  playVideo(filename);
+}
+
+// Play a video overlay
+function playVideo(filename) {
+  if (videoPlaying) return; // Prevent multiple videos at once
+
+  videoPlaying = true;
+
+  const overlay = document.getElementById("videoOverlay");
+  const video = document.getElementById("videoPlayer");
+
+  video.pause();
+  video.currentTime = 0;
+  video.muted = false;
+  video.src = filename;
+  overlay.style.display = "flex";
+
+  const playAttempt = video.play();
+
+  if (playAttempt && typeof playAttempt.catch === "function") {
+    playAttempt.catch(() => {
+      // Fall back to muted autoplay when the browser blocks remote playback.
+      video.muted = true;
+      video.play().catch(() => {
+        overlay.style.display = "none";
+        videoPlaying = false;
+      });
+    });
+  }
+
+  video.onended = () => {
+    overlay.style.display = "none";
+    videoPlaying = false;
+  };
+}
+
+function updateRemoteStatus(message) {
+  return message || "Waiting for controller";
+}
+
+function handleRemoteCommand(command) {
+  if (!command || typeof command !== "object") {
+    return;
+  }
+
+  if (command.type === "play") {
+    playNamedVideo(command.video);
+  }
+
+  if (command.type === "reset") {
+    resetTimer();
+  }
+}
+
+function setupRemotePlayback() {
+  if (typeof Peer === "undefined") {
+    updateRemoteStatus("Remote control unavailable");
+    return;
+  }
+
+  peer = new Peer(remoteChannelId);
+
+  peer.on("open", () => {
+    updateRemoteStatus("Remote control ready");
+  });
+
+  peer.on("connection", (connection) => {
+    updateRemoteStatus("Controller connected");
+
+    connection.on("data", handleRemoteCommand);
+    connection.on("close", () => {
+      updateRemoteStatus("Controller disconnected");
+    });
+  });
+
+  peer.on("error", () => {
+    updateRemoteStatus("Remote control unavailable");
+  });
+}
+
+// Initialize
+updateDisplay();
+updateRemoteStatus();
+startCountdown();
+setupRemotePlayback();
+</script>
+
+</body>
+</html>

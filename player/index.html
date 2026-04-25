@@ -2,138 +2,76 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Space Control Countdown</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LYST Player Launcher</title>
 <style>
 body {
   margin: 0;
-  background: #05070d;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #0b1830 0%, #04060d 55%, #010203 100%);
   color: #00eaff;
   font-family: monospace;
-  overflow: hidden;
-}
-
-#screen {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+}
+
+.panel {
+  width: min(460px, calc(100vw - 32px));
+  padding: 28px;
+  border: 1px solid rgba(0, 234, 255, 0.35);
+  background: rgba(0, 7, 15, 0.82);
+  box-shadow: 0 0 40px rgba(0, 234, 255, 0.12);
   text-align: center;
 }
 
-#label {
-  font-size: 2rem;
-  letter-spacing: 4px;
+h1 {
+  margin: 0 0 10px;
+  font-size: 1.8rem;
+  letter-spacing: 2px;
 }
 
-#timer {
-  font-size: 8rem;
-  margin-top: 20px;
-  text-shadow: 0 0 20px #00eaff;
+p {
+  margin: 0 0 24px;
+  line-height: 1.6;
 }
 
-button {
-  margin: 10px;
-  padding: 10px 20px;
-  background: black;
-  color: #00eaff;
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+a {
+  display: block;
+  padding: 14px 18px;
   border: 1px solid #00eaff;
-  cursor: pointer;
+  background: rgba(0, 0, 0, 0.65);
+  color: #00eaff;
+  text-decoration: none;
 }
 
-button:hover {
-  background: #001a22;
+a:hover {
+  background: rgba(0, 234, 255, 0.12);
 }
 
-#videoOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: black;
-  display: none;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
-}
-
-video {
-  width: 80%;
-  max-height: 80%;
+@media (max-width: 560px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 </head>
-
 <body>
 
-<div id="screen">
-  <div id="label">PLANET DETONATION IN:</div>
-  <div id="timer">06:00</div>
-
-  <div style="margin-top:40px;">
-    <button onclick="playVideo('videos/control-intro.mp4')">Control Intro</button>
-    <button onclick="playVideo('videos/control-goodbye.mp4')">Control Goodbye</button>
-    <button onclick="playVideo('videos/control-symbols.mp4')">Control Symbols</button>
-    <button onclick="resetTimer()">Reset Timer</button>
+<div class="panel">
+  <h1>LYST Launcher</h1>
+  <p>Choose the display screen or the remote control.</p>
+  <div class="actions">
+    <a href="player.html">Player</a>
+    <a href="control.html">Control</a>
   </div>
 </div>
-
-<div id="videoOverlay">
-  <video id="videoPlayer"></video>
-</div>
-
-<script>
-let totalSeconds = 6 * 60;
-let countdownInterval;
-let videoPlaying = false;
-
-// Start the countdown
-function startCountdown() {
-  countdownInterval = setInterval(() => {
-    if (totalSeconds > 0) {
-      totalSeconds--;
-      updateDisplay();
-    }
-  }, 1000);
-}
-
-// Update the timer display
-function updateDisplay() {
-  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-  const seconds = String(totalSeconds % 60).padStart(2, '0');
-  document.getElementById("timer").textContent = `${minutes}:${seconds}`;
-}
-
-// Reset the countdown
-function resetTimer() {
-  totalSeconds = 6 * 60;
-  updateDisplay();
-}
-
-// Play a video overlay
-function playVideo(filename) {
-  if (videoPlaying) return; // Prevent multiple videos at once
-
-  videoPlaying = true;
-
-  const overlay = document.getElementById("videoOverlay");
-  const video = document.getElementById("videoPlayer");
-
-  video.src = filename;
-  overlay.style.display = "flex";
-  video.play();
-
-  video.onended = () => {
-    overlay.style.display = "none";
-    videoPlaying = false;
-  };
-}
-
-// Initialize
-updateDisplay();
-startCountdown();
-</script>
 
 </body>
 </html>
