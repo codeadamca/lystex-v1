@@ -1,7 +1,7 @@
 <script src="form.js"></script>
 <style>@import url("//readme.codeadam.ca/readme.css");</style>
 
-<img src="https://cdn.brickcolab.com/images@1.0.0/brickcolab-logo-coloured-horizontal.png" alt="BrickCoLab" height="100" style="margin-bottom: 10px;" />
+![LYSTEX Logo](images/lystex-logo-low.png)
 
 <!--
 <div style="position: relative; width: 100%; max-width: 100%; height: 0; padding-bottom: 56.25%; margin-bottom: 20px;">
@@ -20,6 +20,14 @@
 [![LYSTEX](images/lystex-low.png)](images/lystex-high.png)
 
 [LYSTEX](https://lystex.codeadam.ca) is a playable video game made entirely out of LEGO® bricks. Players use an Xbox controller to navigate a space rover through a series of puzzles to the bunker before the planet explodes.
+
+### Game Stack
+
+The playable game environment is built using LEGO® bricks. The interactive elements use LEGO® Spike™ and Pybricks (a custom firmware for the LEGO® Spike™).
+
+[![LYSTEX Map](images/map-low.png)](images/map-high.png)
+
+The LYSTEX Player App ia a companion application delivering video hints to the player as checkpoitns are completed. This app is building using vanillia HTML and JavaScript, [Firebase](https://firebase.google.com/), and [GitHub Pages](https://pages.github.com/). 
 
 ### Game Design
 
