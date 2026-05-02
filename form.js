@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 message: message,
                 name: name,
                 email: email,
-                subject: "BrickCoLab Contact Form Submission"
+                subject: "LYSTEX Contact Form Submission"
             })
         });
         if (response.ok) {
