@@ -29,6 +29,12 @@ The playable game environment is built using LEGO® bricks. The interactive elem
 
 The LYSTEX Player App ia a companion application delivering video hints to the player as checkpoitns are completed. This app is building using vanillia HTML and JavaScript, [Firebase](https://firebase.google.com/), and [GitHub Pages](https://pages.github.com/). 
 
+[![LYSTEX Control App](images/app-control.png)](https://lystex.codeadam.ca/player/control.html) [![LYSTEX Player App](images/app-player.png)](https://lystex.codeadam.ca/player/player.html)
+
+1. Open both apps in separate browser windows
+2. Click the player app to allow audio
+3. In the control apop, click a video tpo play or modify the timer 
+
 ### Game Design
 
 Original design drawing includes puzzles and location of key LEGO® components. 
