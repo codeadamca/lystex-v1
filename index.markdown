@@ -23,6 +23,7 @@
 
 Original design drawing includes puzzles and location of key LEGO® components. 
 
+![LKYSTEX Original Design](images/design-low.png)
 
 > <small>LEGO® is a trademark of the LEGO Group of companies which does not sponsor, authorize or endorse this site.</small>
 
