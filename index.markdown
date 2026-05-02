@@ -17,15 +17,15 @@
 
 ## What is LYSTEX?
 
-![LYSTEX](images/lystex-low.png)
+[![LYSTEX](images/lystex-low.png)](images/lystex-high.png)
 
-[LYSTEX](https://lystex.codeadam.ca) is a playable video game made entirely out of LEGO® bricks. Players use an Xbox controller to naviaget a space rover back to the bunker before the planet explodes.
+[LYSTEX](https://lystex.codeadam.ca) is a playable video game made entirely out of LEGO® bricks. Players use an Xbox controller to navigate a space rover through a series of puzzles to the bunker before the planet explodes.
 
 ### Game Design
 
 Original design drawing includes puzzles and location of key LEGO® components. 
 
-![LKYSTEX Original Design](images/design-low.png)
+[![LKYSTEX Original Design](images/design-low.png)](images/design-high.png)
 
 > <small>LEGO® is a trademark of the LEGO Group of companies which does not sponsor, authorize or endorse this site.</small>
 
@@ -33,7 +33,7 @@ Original design drawing includes puzzles and location of key LEGO® components.
 
 ## Make Contact
 
-Reach out to request an activity for your students:
+Reach out to request a custom interactive LEGO® experience:
 
 <form id="contactForm" action="#" method="post" style="max-width:800px;">
     <label for="name">Name:</label><br>
